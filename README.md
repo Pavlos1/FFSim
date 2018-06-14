@@ -13,7 +13,7 @@ cp target/debug/libffsim.so $XPLANE_DIR/Resources/plugins/ffsim.xpl
 The name of the DLL (`libffsim.so`) will differ slightly on Windows and
 macOS. The destination file should still have the extension `.xpl`.
 
-Make sure to delete `libffsim.so` after you have finished testing, as this
+Make sure to delete `ffsim.xpl` after you have finished testing, as this
 plugin will disable user inputs.
 
 ## Optimized Build
