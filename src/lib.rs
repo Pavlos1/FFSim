@@ -28,6 +28,11 @@ struct FFSim {
     pitch_rate: DataRef<f32, ReadOnly>, // ...
     yaw_rate: DataRef<f32, ReadOnly>,   // ...
 
+    // XXX: Remember to negate these guys!!
+    true_theta: DataRef<f32, ReadOnly>, // degrees, pitch
+    true_phi: DataRef<f32, ReadOnly>,   // degrees, roll
+    mag_psi: DataRef<f32, ReadOnly>,    // degrees, yaw
+
     // TODO: Acceleration for IMU
     // (There's acceleration in "OpenGL coordinates"
     //  under sim/flightmodel/position/, but I'm not
@@ -60,6 +65,10 @@ impl Plugin for FFSim {
             roll_rate: DataRef::find("sim/flightmodel/position/P")?,
             pitch_rate: DataRef::find("sim/flightmodel/position/Q")?,
             yaw_rate: DataRef::find("sim/flightmodel/position/R")?,
+
+            true_theta: DataRef::find("sim/flightmodel/position/true_theta")?,
+            true_phi: DataRef::find("sim/flightmodel/position/true_phi")?,
+            mag_psi: DataRef::find("sim/flightmodel/position/mag_psi")?,
 
             latitude: DataRef::find("sim/flightmodel/position/latitude")?,
             longitude: DataRef::find("sim/flightmodel/position/longitude")?,
