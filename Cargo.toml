@@ -1,0 +1,12 @@
+[package]
+name = "ffsim"
+version = "0.1.0"
+authors = ["Pavel Zakopaylo <zakopaylo2@gmail.com>"]
+
+[lib]
+crate-type = ["dylib"]
+doctest = false
+
+[dependencies]
+xplm = "*"
+triple_buffer = "*"
