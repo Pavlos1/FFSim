@@ -30,14 +30,12 @@ struct FFSim {
 
     // XXX: Remember to negate these guys!!
     true_theta: DataRef<f32, ReadOnly>, // degrees, pitch
-    true_phi: DataRef<f32, ReadOnly>,   // degrees, roll
     mag_psi: DataRef<f32, ReadOnly>,    // degrees, yaw
 
-    // TODO: Acceleration for IMU
-    // (There's acceleration in "OpenGL coordinates"
-    //  under sim/flightmodel/position/, but I'm not
-    //  sure how this would relate to physical measurements
-    //  from an accelerometer.)
+    local_ax: DataRef<f32, ReadOnly>,
+    local_ay: DataRef<f32, ReadOnly>,
+    local_az: DataRef<f32, ReadOnly>,
+    plane_orientation_quaternion: DataRef<[f32], ReadOnly>, // Remember to negate 4th component
 
     latitude: DataRef<f64, ReadOnly>,  // degrees
     longitude: DataRef<f64, ReadOnly>, // ...
@@ -67,8 +65,12 @@ impl Plugin for FFSim {
             yaw_rate: DataRef::find("sim/flightmodel/position/R")?,
 
             true_theta: DataRef::find("sim/flightmodel/position/true_theta")?,
-            true_phi: DataRef::find("sim/flightmodel/position/true_phi")?,
             mag_psi: DataRef::find("sim/flightmodel/position/mag_psi")?,
+
+            local_ax: DataRef::find("sim/flightmodel/position/local_ax")?,
+            local_ay: DataRef::find("sim/flightmodel/position/local_ay")?,
+            local_az: DataRef::find("sim/flightmodel/position/local_az")?,
+            plane_orientation_quaternion: DataRef::find("sim/flightmodel/position/q")?,
 
             latitude: DataRef::find("sim/flightmodel/position/latitude")?,
             longitude: DataRef::find("sim/flightmodel/position/longitude")?,
