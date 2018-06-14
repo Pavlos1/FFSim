@@ -35,13 +35,13 @@ struct FFSim {
     local_ax: DataRef<f32, ReadOnly>,
     local_ay: DataRef<f32, ReadOnly>,
     local_az: DataRef<f32, ReadOnly>,
-    plane_orientation_quaternion: DataRef<[f32], ReadOnly>, // Remember to negate 4th component
+    plane_orientation_quaternion: DataRef<[f32], ReadOnly>, // XXX: Remember to negate 4th component
 
     latitude: DataRef<f64, ReadOnly>,  // degrees
     longitude: DataRef<f64, ReadOnly>, // ...
 
-    indicated_airspeed: DataRef<f32, ReadOnly>,
-    altitude: DataRef<f32, ReadOnly>,
+    indicated_airspeed: DataRef<f32, ReadOnly>, // kias??
+    altitude: DataRef<f32, ReadOnly>, // feet or metres??
 }
 
 impl Plugin for FFSim {
