@@ -15,13 +15,6 @@ extern crate triple_buffer;
 // See FFSim struct for comments about these values
 #[derive(Copy, Clone, Debug)]
 struct BufferedFlightData {
-    rudder: f32,
-    left_aileron: f32,
-    right_aileron: f32,
-    elevator: f32,
-
-    throttle: f32,
-
     roll_rate: f32,
     pitch_rate: f32,
     yaw_rate: f32,
@@ -44,11 +37,6 @@ struct BufferedFlightData {
 impl BufferedFlightData {
     fn new() -> Self {
         BufferedFlightData {
-            rudder: 0.0,
-            left_aileron: 0.0,
-            right_aileron: 0.0,
-            elevator: 0.0,
-            throttle: 0.0,
             roll_rate: 0.0,
             pitch_rate: 0.0,
             yaw_rate: 0.0,
@@ -62,6 +50,28 @@ impl BufferedFlightData {
             longitude: 0.0,
             indicated_airspeed: 0.0,
             altitude: 0.0,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+struct BufferedControlData {
+    rudder: f32,
+    left_aileron: f32,
+    right_aileron: f32,
+    elevator: f32,
+
+    throttle: f32,
+}
+
+impl BufferedControlData {
+    fn new() -> Self {
+        BufferedControlData {
+            rudder: 0.0,
+            left_aileron: 0.0,
+            right_aileron: 0.0,
+            elevator: 0.0,
+            throttle: 0.0,
         }
     }
 }
@@ -104,6 +114,7 @@ struct FFSim {
 
 
     // Buffers for bidirectional communication
+    incoming: Output<BufferedControlData>,
     outgoing: Input<BufferedFlightData>,
 }
 
@@ -114,11 +125,6 @@ impl FFSim {
         self.throttle.get(&mut throttle_buf);
 
         let mut ret = BufferedFlightData {
-            rudder: self.rudder.get(),
-            left_aileron: self.left_aileron.get(),
-            right_aileron: self.right_aileron.get(),
-            elevator: self.elevator.get(),
-            throttle: throttle_buf[0],
             roll_rate: self.roll_rate.get(),
             pitch_rate: self.pitch_rate.get(),
             yaw_rate: self.yaw_rate.get(),
@@ -143,6 +149,8 @@ impl FFSim {
 impl Plugin for FFSim {
     type StartErr = FindError;
     fn start() -> Result<Self, Self::StartErr> {
+        let (mut incoming_send, mut incoming_recv)
+            = TripleBuffer::new(BufferedControlData::new()).split();
         let (mut outgoing_send, mut outgoing_recv)
             = TripleBuffer::new(BufferedFlightData::new()).split();
 
@@ -178,6 +186,7 @@ impl Plugin for FFSim {
             altitude: DataRef::find("sim/flightmodel/misc/h_ind")?, // XXX: Can have a "2" at the end?
                                                                            // Also this is barometric altitude; we _probably_ want this
                                                                            // instead of the absolute elevation above MSL.
+            incoming: incoming_recv,
             outgoing: outgoing_send,
         };
 
@@ -185,11 +194,18 @@ impl Plugin for FFSim {
         plugin.override_control_surfaces.set(true);
         plugin.override_throttles.set(true);
 
+        // Thread to send flight data to controller
         thread::spawn(move|| {
             loop {
                 println!("Read: {:?}", *outgoing_recv.read());
                 thread::sleep(time::Duration::from_millis(100));
             }
+        });
+
+        // Thread to receive controller inputs
+        thread::spawn(move|| {
+            incoming_send.write(BufferedControlData::new());
+            thread::sleep(time::Duration::from_millis(100));
         });
 
         println!("[FFSim] Plugin loaded");
