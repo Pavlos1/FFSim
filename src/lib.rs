@@ -3,13 +3,11 @@ extern crate xplm;
 use xplm::plugin::{Plugin, PluginInfo};
 
 use xplm::data::borrowed::{DataRef, FindError};
-use xplm::data::{ReadOnly, ReadWrite, DataRead, DataReadWrite, ArrayRead, StringRead};
+use xplm::data::{ReadOnly, ReadWrite, DataRead, DataReadWrite, ArrayRead, ArrayReadWrite};
+use xplm::flight_loop::{FlightLoop, LoopState};
 use triple_buffer::{TripleBuffer, Input, Output};
 use std::{thread, time};
-use std::sync::Arc;
 
-#[macro_use]
-extern crate lazy_static;
 extern crate triple_buffer;
 
 // See FFSim struct for comments about these values
@@ -78,7 +76,7 @@ impl BufferedControlData {
 
 struct FFSim {
     // overrides all flight control, i.e. throttle, control surfaces etc.
-    override_flightcontrol: DataRef<bool, ReadWrite>,
+    //override_flightcontrol: DataRef<bool, ReadWrite>,
     // overrides only control surfaces
     override_control_surfaces: DataRef<bool, ReadWrite>,
     // overrides only the throttle
@@ -149,13 +147,13 @@ impl FFSim {
 impl Plugin for FFSim {
     type StartErr = FindError;
     fn start() -> Result<Self, Self::StartErr> {
-        let (mut incoming_send, mut incoming_recv)
+        let (mut incoming_send, incoming_recv)
             = TripleBuffer::new(BufferedControlData::new()).split();
-        let (mut outgoing_send, mut outgoing_recv)
+        let (outgoing_send, mut outgoing_recv)
             = TripleBuffer::new(BufferedFlightData::new()).split();
 
         let mut plugin = FFSim {
-            override_flightcontrol: DataRef::find("sim/operation/override/override_flightcontrol")?.writeable()?,
+            //override_flightcontrol: DataRef::find("sim/operation/override/override_flightcontrol")?.writeable()?,
             override_control_surfaces: DataRef::find("sim/operation/override/override_control_surfaces")?.writeable()?,
             override_throttles: DataRef::find("sim/operation/override/override_throttles")?.writeable()?,
 
@@ -207,6 +205,33 @@ impl Plugin for FFSim {
             incoming_send.write(BufferedControlData::new());
             thread::sleep(time::Duration::from_millis(100));
         });
+
+        // Read control inputs and write flight data to the buffers every flight cycle
+        let mut flight_loop = FlightLoop::new(|_loop_state: &mut LoopState| {
+            // `PLUGIN` is a global created by `xplane_plugin!`
+            // It *should* be safe to take an exclusive reference,
+            // since X-Plane does not call us concurrently.
+            let plugin : &mut FFSim = unsafe { &mut *PLUGIN };
+
+            // Read from triple buffer and update controls
+            let control = *plugin.incoming.read();
+            plugin.rudder.set(control.rudder);
+            plugin.left_aileron.set(control.left_aileron);
+            plugin.right_aileron.set(control.right_aileron);
+            plugin.elevator.set(control.elevator);
+
+            // Throttle is a bit trickier b/c it's an array,
+            // but we only have one engine so we only set the
+            // first element.
+            let mut throttle_buf = [0.0; 8];
+            throttle_buf[0] = control.throttle;
+            plugin.throttle.set(&mut throttle_buf);
+
+            // Write flight data into triple buffer
+            let flight_data = plugin.get_data();
+            plugin.outgoing.write(flight_data);
+        });
+        flight_loop.schedule_immediate();
 
         println!("[FFSim] Plugin loaded");
         Ok(plugin)

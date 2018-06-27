@@ -10,4 +10,3 @@ doctest = false
 [dependencies]
 xplm = "*"
 triple_buffer = "*"
-lazy_static = "*"
