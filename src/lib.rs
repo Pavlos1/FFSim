@@ -4,10 +4,16 @@ use xplm::plugin::{Plugin, PluginInfo};
 
 use xplm::data::borrowed::{DataRef, FindError};
 use xplm::data::{ReadOnly, ReadWrite, DataRead, DataReadWrite, ArrayRead, StringRead};
+use triple_buffer::{TripleBuffer, Input, Output};
+use std::{thread, time};
+use std::sync::Arc;
 
+#[macro_use]
+extern crate lazy_static;
 extern crate triple_buffer;
 
 // See FFSim struct for comments about these values
+#[derive(Copy, Clone, Debug)]
 struct BufferedFlightData {
     rudder: f32,
     left_aileron: f32,
@@ -33,6 +39,31 @@ struct BufferedFlightData {
 
     indicated_airspeed: f32,
     altitude: f32,
+}
+
+impl BufferedFlightData {
+    fn new() -> Self {
+        BufferedFlightData {
+            rudder: 0.0,
+            left_aileron: 0.0,
+            right_aileron: 0.0,
+            elevator: 0.0,
+            throttle: 0.0,
+            roll_rate: 0.0,
+            pitch_rate: 0.0,
+            yaw_rate: 0.0,
+            true_theta: 0.0,
+            mag_psi: 0.0,
+            local_ax: 0.0,
+            local_ay: 0.0,
+            local_az: 0.0,
+            plane_orientation_quaternion: [0.0; 4],
+            latitude: 0.0,
+            longitude: 0.0,
+            indicated_airspeed: 0.0,
+            altitude: 0.0,
+        }
+    }
 }
 
 struct FFSim {
@@ -70,6 +101,10 @@ struct FFSim {
 
     indicated_airspeed: DataRef<f32, ReadOnly>, // kias??
     altitude: DataRef<f32, ReadOnly>, // feet or metres??
+
+
+    // Buffers for bidirectional communication
+    outgoing: Input<BufferedFlightData>,
 }
 
 impl FFSim {
@@ -108,6 +143,9 @@ impl FFSim {
 impl Plugin for FFSim {
     type StartErr = FindError;
     fn start() -> Result<Self, Self::StartErr> {
+        let (mut outgoing_send, mut outgoing_recv)
+            = TripleBuffer::new(BufferedFlightData::new()).split();
+
         let mut plugin = FFSim {
             override_flightcontrol: DataRef::find("sim/operation/override/override_flightcontrol")?.writeable()?,
             override_control_surfaces: DataRef::find("sim/operation/override/override_control_surfaces")?.writeable()?,
@@ -140,11 +178,19 @@ impl Plugin for FFSim {
             altitude: DataRef::find("sim/flightmodel/misc/h_ind")?, // XXX: Can have a "2" at the end?
                                                                            // Also this is barometric altitude; we _probably_ want this
                                                                            // instead of the absolute elevation above MSL.
+            outgoing: outgoing_send,
         };
 
         //plugin.override_flightcontrol.set(true);
         plugin.override_control_surfaces.set(true);
         plugin.override_throttles.set(true);
+
+        thread::spawn(move|| {
+            loop {
+                println!("Read: {:?}", *outgoing_recv.read());
+                thread::sleep(time::Duration::from_millis(100));
+            }
+        });
 
         println!("[FFSim] Plugin loaded");
         Ok(plugin)
@@ -170,6 +216,8 @@ impl Plugin for FFSim {
         //self.override_flightcontrol.set(false);
         self.override_control_surfaces.set(false);
         self.override_throttles.set(false);
+
+        //TODO: Stop threads
     }
 }
 
