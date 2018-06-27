@@ -7,6 +7,34 @@ use xplm::data::{ReadOnly, ReadWrite, DataRead, DataReadWrite, ArrayRead, String
 
 extern crate triple_buffer;
 
+// See FFSim struct for comments about these values
+struct BufferedFlightData {
+    rudder: f32,
+    left_aileron: f32,
+    right_aileron: f32,
+    elevator: f32,
+
+    throttle: f32,
+
+    roll_rate: f32,
+    pitch_rate: f32,
+    yaw_rate: f32,
+
+    true_theta: f32,
+    mag_psi: f32,
+
+    local_ax: f32,
+    local_ay: f32,
+    local_az: f32,
+    plane_orientation_quaternion: [f32; 4],
+
+    latitude: f64,
+    longitude: f64,
+
+    indicated_airspeed: f32,
+    altitude: f32,
+}
+
 struct FFSim {
     // overrides all flight control, i.e. throttle, control surfaces etc.
     override_flightcontrol: DataRef<bool, ReadWrite>,
@@ -42,6 +70,39 @@ struct FFSim {
 
     indicated_airspeed: DataRef<f32, ReadOnly>, // kias??
     altitude: DataRef<f32, ReadOnly>, // feet or metres??
+}
+
+impl FFSim {
+    fn get_data(&self) -> BufferedFlightData {
+        // Throttle: we are only interested in first value
+        let mut throttle_buf: [f32; 4] = [0.0; 4];
+        self.throttle.get(&mut throttle_buf);
+
+        let mut ret = BufferedFlightData {
+            rudder: self.rudder.get(),
+            left_aileron: self.left_aileron.get(),
+            right_aileron: self.right_aileron.get(),
+            elevator: self.elevator.get(),
+            throttle: throttle_buf[0],
+            roll_rate: self.roll_rate.get(),
+            pitch_rate: self.pitch_rate.get(),
+            yaw_rate: self.yaw_rate.get(),
+            true_theta: self.true_theta.get(),
+            mag_psi: self.mag_psi.get(),
+            local_ax: self.local_ax.get(),
+            local_ay: self.local_ay.get(),
+            local_az: self.local_az.get(),
+            plane_orientation_quaternion: [0.0; 4],
+            latitude: self.latitude.get(),
+            longitude: self.longitude.get(),
+            indicated_airspeed: self.indicated_airspeed.get(),
+            altitude: self.altitude.get(),
+        };
+
+        self.plane_orientation_quaternion.get(&mut ret.plane_orientation_quaternion);
+
+        ret
+    }
 }
 
 impl Plugin for FFSim {
