@@ -74,6 +74,50 @@ impl BufferedControlData {
     }
 }
 
+#[repr(C)]
+struct FlightData {
+    // lsm6dsm: Outputs are in 2's complement, 16 bits
+    // Units: X milli-G / least-significant-bit,
+    //        depending on Full Scale representation.
+    //        (See data sheet, we're using PM 2000 dps)
+    roll_rate: i16,
+    pitch_rate: i16,
+    yaw_rate: i16,
+
+    // Sim. to above, same datasheet, PM 8G
+    lin_acc_x: i16,
+    lin_acc_y: i16,
+    lin_acc_z: i16,
+
+    // en.DM00075867, sim to above .. PM 4 gauss
+    mag_x: i16,
+    mag_y: i16,
+    mag_z: i16,
+    temp: i16, // can also get from barometer, both 16 bits
+
+    // lps25hb
+    barometer: u32, // 24 bits, 4K LSB/hPa, abs. range 260-1260 hPa
+
+    // Sensirion_Differential_Pressure_Sensors_SDP3x_Digital_Datasheet
+    // 60 or 240 Pa/LSB for 31 and 32 resp. Probably 32.
+    airspeed_pressure: i16,
+
+    // GPS in NMEA
+    gps: [u8; 82],
+}
+
+#[repr(C)]
+struct ControlData {
+    // 11 bits each; unsigned so at 0 control surface is down.
+    rudder: u16,
+    left_aileron: u16,
+    right_aileron: u16,
+    elevator: u16,
+
+    // also 11 bit unsigned
+    throttle: u16,
+}
+
 struct FFSim {
     // overrides all flight control, i.e. throttle, control surfaces etc.
     //override_flightcontrol: DataRef<bool, ReadWrite>,
