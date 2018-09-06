@@ -12,11 +12,13 @@ mod buffered_control_data;
 mod buffered_flight_data;
 mod control_data;
 mod flight_data;
+mod quaternion;
 
 use self::buffered_control_data::BufferedControlData;
 use self::buffered_flight_data::BufferedFlightData;
 use self::control_data::ControlData;
 use self::flight_data::FlightData;
+use self::quaternion::Quaternion;
 
 extern crate triple_buffer;
 

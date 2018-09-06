@@ -1,6 +1,7 @@
 use std::f32::consts::PI;
 
 use super::BufferedFlightData;
+use super::Quaternion;
 
 #[repr(C)]
 pub struct FlightData {
@@ -69,14 +70,28 @@ impl FlightData {
         let mag_field_str: f32 = 0.45f32; // in gauss for ease of conversion
         let mag_field_str_conversion: f32 = 6842f32;
 
+        // The quaternion is from OpenGL coordinates to the plane's, so
+        // we invert (conjugate) it, and then rotate the acceleration
+        // in OpenGL coordinates.
+        // (Units remain m/s^2 since the quaternion is only a rotation)
+        let lin_acc = Quaternion::new([
+            bfd.plane_orientation_quaternion[0],
+            bfd.plane_orientation_quaternion[1],
+            bfd.plane_orientation_quaternion[2],
+            bfd.plane_orientation_quaternion[3],
+        ]).conj().rotate([bfd.local_ax, bfd.local_ay, bfd.local_az]);
+        let acc_conversion: f32 = (1f32 / 9.8f32)  // m/s^2 -> g
+            * 1000f32 // g -> mg
+            * (1f32 / 0.244f32); // mg -> LSB
+
         FlightData {
             roll_rate: (bfd.roll_rate * angular_rate_conversion) as i16,
             pitch_rate: (bfd.pitch_rate * angular_rate_conversion) as i16,
             yaw_rate: (bfd.yaw_rate * angular_rate_conversion) as i16,
 
-            lin_acc_x: 0,
-            lin_acc_y: 0,
-            lin_acc_z: 0,
+            lin_acc_x: (lin_acc[0] * acc_conversion) as i16,
+            lin_acc_y: (lin_acc[1] * acc_conversion) as i16,
+            lin_acc_z: (lin_acc[2] * acc_conversion) as i16,
 
             mag_x: (norm_mag_x * mag_field_str * mag_field_str_conversion) as i16,
             mag_y: (norm_mag_y * mag_field_str * mag_field_str_conversion) as i16,
