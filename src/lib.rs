@@ -60,7 +60,7 @@ struct FFSim {
     barometer_inhg: DataRef<f32, ReadOnly>, // feet or metres??
 
     temperature_ambient_c: DataRef<f32, ReadOnly>, // temp outisde the aircraft
-    temperature_le_c: DataRef<f32, ReadOnly>,      // temp at the leading edge of the wing
+    //temperature_le_c: DataRef<f32, ReadOnly>,      // temp at the leading edge of the wing
     air_density: DataRef<f32, ReadOnly>, // kg / m^3
 
     // Buffers for bidirectional communication
@@ -137,7 +137,7 @@ impl Plugin for FFSim {
             indicated_airspeed: DataRef::find("sim/flightmodel/position/indicated_airspeed")?, // XXX: Can have a "2" at the end?
             barometer_inhg: DataRef::find("sim/weather/barometer_current_inhg")?,
             temperature_ambient_c: DataRef::find("sim/weather/temperature_ambient_c")?,
-            temperature_le_c: DataRef::find("sim/weather/temperature_le_c")?,
+            //temperature_le_c: DataRef::find("sim/weather/temperature_le_c")?,
             air_density: DataRef::find("sim/weather/rho")?,
 
             incoming: incoming_recv,
