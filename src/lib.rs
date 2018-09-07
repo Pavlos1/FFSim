@@ -7,6 +7,7 @@ use xplm::data::{ReadOnly, ReadWrite, DataRead, DataReadWrite, ArrayRead, ArrayR
 use xplm::flight_loop::{FlightLoop, LoopState};
 use triple_buffer::{TripleBuffer, Input, Output};
 use std::{thread, time};
+use std::sync::atomic::{AtomicBool, Ordering, ATOMIC_BOOL_INIT};
 
 mod buffered_control_data;
 mod buffered_flight_data;
@@ -22,6 +23,7 @@ use self::quaternion::Quaternion;
 
 extern crate triple_buffer;
 
+static STOP_THREADS: AtomicBool = ATOMIC_BOOL_INIT;
 
 struct FFSim {
     // overrides all flight control, i.e. throttle, control surfaces etc.
@@ -148,9 +150,15 @@ impl Plugin for FFSim {
         plugin.override_control_surfaces.set(true);
         plugin.override_throttles.set(true);
 
+        STOP_THREADS.store(false, Ordering::SeqCst);
+
         // Thread to send flight data to controller
         thread::spawn(move|| {
             loop {
+                if STOP_THREADS.load(Ordering::SeqCst) {
+                    break;
+                }
+
                 println!("Read: {:?}", *outgoing_recv.read());
                 thread::sleep(time::Duration::from_millis(100));
             }
@@ -158,8 +166,14 @@ impl Plugin for FFSim {
 
         // Thread to receive controller inputs
         thread::spawn(move|| {
-            incoming_send.write(BufferedControlData::new());
-            thread::sleep(time::Duration::from_millis(100));
+            loop {
+                if STOP_THREADS.load(Ordering::SeqCst) {
+                    break;
+                }
+
+                incoming_send.write(BufferedControlData::new());
+                thread::sleep(time::Duration::from_millis(100));
+            }
         });
 
         // Read control inputs and write flight data to the buffers every flight cycle
@@ -214,7 +228,7 @@ impl Plugin for FFSim {
         self.override_control_surfaces.set(false);
         self.override_throttles.set(false);
 
-        //TODO: Stop threads
+        STOP_THREADS.store(true, Ordering::SeqCst);
     }
 }
 

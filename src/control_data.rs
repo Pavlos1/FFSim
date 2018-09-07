@@ -24,7 +24,8 @@ pub struct ControlData {
 impl ControlData {
     pub fn verify(&self) -> bool {
         let raw_bytes: [u8; 20] = unsafe { transmute(*self) };
-        (!(raw_bytes[4 .. 16].iter().fold(0u32, |sum, val| sum + (*val as u32)))
-            == self.checksum) && (raw_bytes[.. 4] == *("SYNC".as_bytes()))
+        (!(raw_bytes[4 .. 16].iter()
+            .fold(0u32, |sum, val| sum.wrapping_add(*val as u32)))
+                == self.checksum) && (raw_bytes[.. 4] == *("SYNC".as_bytes()))
     }
 }

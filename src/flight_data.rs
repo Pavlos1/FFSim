@@ -123,7 +123,7 @@ impl FlightData {
         let checksum: u32 = {
             let raw_bytes: [u8; 116] = unsafe { transmute(ret) };
             !(raw_bytes[4 .. 112].iter()
-                .fold(0u32, |sum, val| sum + (*val as u32)))
+                .fold(0u32, |sum, val| sum.wrapping_add(*val as u32)))
         };
         ret.checksum = checksum;
 
