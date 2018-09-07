@@ -6,7 +6,7 @@ use xplm::data::borrowed::{DataRef, FindError};
 use xplm::data::{ReadOnly, ReadWrite, DataRead, DataReadWrite, ArrayRead, ArrayReadWrite};
 use xplm::flight_loop::{FlightLoop, LoopState};
 use triple_buffer::{TripleBuffer, Input, Output};
-use std::{thread, time};
+use std::thread;
 use std::sync::atomic::{AtomicBool, Ordering, ATOMIC_BOOL_INIT};
 
 mod buffered_control_data;
@@ -14,6 +14,7 @@ mod buffered_flight_data;
 mod control_data;
 mod flight_data;
 mod quaternion;
+mod comm;
 
 use self::buffered_control_data::BufferedControlData;
 use self::buffered_flight_data::BufferedFlightData;
@@ -22,8 +23,9 @@ use self::flight_data::FlightData;
 use self::quaternion::Quaternion;
 
 extern crate triple_buffer;
+extern crate serial;
 
-static STOP_THREADS: AtomicBool = ATOMIC_BOOL_INIT;
+pub static STOP_THREADS: AtomicBool = ATOMIC_BOOL_INIT;
 
 struct FFSim {
     // overrides all flight control, i.e. throttle, control surfaces etc.
@@ -53,15 +55,15 @@ struct FFSim {
     local_ax: DataRef<f32, ReadOnly>,
     local_ay: DataRef<f32, ReadOnly>,
     local_az: DataRef<f32, ReadOnly>,
-    plane_orientation_quaternion: DataRef<[f32], ReadOnly>, // XXX: Remember to negate 4th component
+    plane_orientation_quaternion: DataRef<[f32], ReadOnly>, // XXX: Remember to negate non-scalar parts
 
     latitude: DataRef<f64, ReadOnly>,  // degrees
     longitude: DataRef<f64, ReadOnly>, // ...
 
-    indicated_airspeed: DataRef<f32, ReadOnly>, // kias??
-    barometer_inhg: DataRef<f32, ReadOnly>, // feet or metres??
+    indicated_airspeed: DataRef<f32, ReadOnly>, // knot indicated airspeed
+    barometer_inhg: DataRef<f32, ReadOnly>,
 
-    temperature_ambient_c: DataRef<f32, ReadOnly>, // temp outisde the aircraft
+    temperature_ambient_c: DataRef<f32, ReadOnly>, // temp outside the aircraft
     //temperature_le_c: DataRef<f32, ReadOnly>,      // temp at the leading edge of the wing
     air_density: DataRef<f32, ReadOnly>, // kg / m^3
 
@@ -103,11 +105,13 @@ impl FFSim {
 impl Plugin for FFSim {
     type StartErr = FindError;
     fn start() -> Result<Self, Self::StartErr> {
-        let (mut incoming_send, incoming_recv)
+        /* Initialize triple buffers */
+        let (incoming_send, incoming_recv)
             = TripleBuffer::new(BufferedControlData::new()).split();
-        let (outgoing_send, mut outgoing_recv)
+        let (outgoing_send, outgoing_recv)
             = TripleBuffer::new(BufferedFlightData::new()).split();
 
+        /* Get handles to datarefs */
         let mut plugin = FFSim {
             //override_flightcontrol: DataRef::find("sim/operation/override/override_flightcontrol")?.writeable()?,
             override_control_surfaces: DataRef::find("sim/operation/override/override_control_surfaces")?.writeable()?,
@@ -152,32 +156,14 @@ impl Plugin for FFSim {
 
         STOP_THREADS.store(false, Ordering::SeqCst);
 
-        // Thread to send flight data to controller
-        thread::spawn(move|| {
-            loop {
-                if STOP_THREADS.load(Ordering::SeqCst) {
-                    break;
-                }
+        /* Thread to send flight data to controller */
+        thread::spawn(move|| comm::send_flight_data_thread(outgoing_recv));
 
-                println!("Read: {:?}", *outgoing_recv.read());
-                thread::sleep(time::Duration::from_millis(100));
-            }
-        });
+        /* Thread to receive controller inputs */
+        thread::spawn(move|| comm::recv_control_data_thread(incoming_send));
 
-        // Thread to receive controller inputs
-        thread::spawn(move|| {
-            loop {
-                if STOP_THREADS.load(Ordering::SeqCst) {
-                    break;
-                }
-
-                incoming_send.write(BufferedControlData::new());
-                thread::sleep(time::Duration::from_millis(100));
-            }
-        });
-
-        // Read control inputs and write flight data to the buffers every flight cycle
-        let mut flight_loop = FlightLoop::new(|_loop_state: &mut LoopState| {
+        /* Read control inputs and write flight data to the buffers every flight cycle */
+        FlightLoop::new(|_loop_state: &mut LoopState| {
             // `PLUGIN` is a global created by `xplane_plugin!`
             // It *should* be safe to take an exclusive reference,
             // since X-Plane does not call us concurrently.
@@ -200,8 +186,7 @@ impl Plugin for FFSim {
             // Write flight data into triple buffer
             let flight_data = plugin.get_data();
             plugin.outgoing.write(flight_data);
-        });
-        flight_loop.schedule_immediate();
+        }).schedule_immediate();
 
         println!("[FFSim] Plugin loaded");
         Ok(plugin)

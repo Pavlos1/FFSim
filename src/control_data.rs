@@ -21,11 +21,13 @@ pub struct ControlData {
     checksum: u32,
 }
 
+pub const CONTROL_DATA_SIZE: usize = 20;
+
 impl ControlData {
     pub fn verify(&self) -> bool {
-        let raw_bytes: [u8; 20] = unsafe { transmute(*self) };
-        (!(raw_bytes[4 .. 16].iter()
+        let raw_bytes: [u8; CONTROL_DATA_SIZE] = unsafe { transmute(*self) };
+        (!(raw_bytes[4 .. CONTROL_DATA_SIZE - 4].iter()
             .fold(0u32, |sum, val| sum.wrapping_add(*val as u32)))
-                == self.checksum) && (raw_bytes[.. 4] == *("SYNC".as_bytes()))
+                == self.checksum) && (raw_bytes[.. 4] == *"SYNC".as_bytes())
     }
 }

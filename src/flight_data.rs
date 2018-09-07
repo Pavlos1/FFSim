@@ -49,6 +49,8 @@ pub struct FlightData {
     checksum: u32
 }
 
+pub const FLIGHT_DATA_SIZE: usize = 116;
+
 impl FlightData {
     pub fn new(bfd: BufferedFlightData) -> Self {
         /* See comments on `FlightData` for info about conversions */
@@ -121,8 +123,8 @@ impl FlightData {
         };
 
         let checksum: u32 = {
-            let raw_bytes: [u8; 116] = unsafe { transmute(ret) };
-            !(raw_bytes[4 .. 112].iter()
+            let raw_bytes: [u8; FLIGHT_DATA_SIZE] = unsafe { transmute(ret) };
+            !(raw_bytes[4 .. FLIGHT_DATA_SIZE - 4].iter()
                 .fold(0u32, |sum, val| sum.wrapping_add(*val as u32)))
         };
         ret.checksum = checksum;

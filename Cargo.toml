@@ -10,3 +10,4 @@ doctest = false
 [dependencies]
 xplm = "*"
 triple_buffer = "*"
+serial = "*"
