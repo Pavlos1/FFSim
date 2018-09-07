@@ -1,4 +1,5 @@
 use std::f32::consts::PI;
+use std::ops::BitXor;
 
 use super::BufferedFlightData;
 use super::Quaternion;
@@ -102,7 +103,60 @@ impl FlightData {
             airspeed_pressure: (kias_to_pa(bfd.indicated_airspeed)
                 * airspeed_pressure_conversion) as i16,
 
-            gps: [0; 82],
+            gps: Self::conv_to_nmea(bfd.latitude, bfd.longitude),
         }
+    }
+
+    // XXX: There are other NMEA formats we could send,
+    //      but for simplicity we'll just send global
+    //      position data.
+    fn conv_to_nmea(lat: f64, long: f64) -> [u8; 82] {
+        let mut res = String::new();
+
+        // header
+        res.push_str("$");
+        res.push_str("GL");  // GLORY TO THE MOTHERLAND
+        res.push_str("GLL"); // Latitude/Longitude info
+        res.push_str(",");
+
+        // latitude
+        res.push_str(format!("{:.2}", lat.abs()).as_str()); // abs lat to 2dp
+        res.push_str(",");
+        // sign according to ISO-6709 (hopefully)
+        if lat.is_sign_positive() {
+            res.push_str("N");
+        } else {
+            res.push_str("S");
+        }
+        res.push_str(",");
+
+        // longitude
+        res.push_str(format!("{:.2}", long.abs()).as_str());
+        res.push_str(",");
+        if long.is_sign_positive() {
+            res.push_str("E");
+        } else {
+            res.push_str("W");
+        }
+
+        /* We're not bothering with the time of the fix for now
+           since the FPGA and flightsim don't synchronize their
+           clocks anyway. */
+
+        // checksum
+        res.push_str("*");
+        let check: u8 = res[1 .. res.len()-1] // the $ and * aren't part of the checksum
+            .as_bytes().iter()
+            // checksum is XOR of all elements
+            .fold(0u8, |tot, val| tot.bitxor(*val));
+
+        res.push_str(format!("{:02X}", check).as_str()); // format as 2 hex digits
+
+        // CRLF indicates end of string
+        res.push_str("\r\n");
+
+        let mut ret: [u8; 82] = [0u8; 82];
+        ret.copy_from_slice(res.as_bytes());
+        ret
     }
 }
