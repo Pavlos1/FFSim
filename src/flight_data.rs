@@ -1,11 +1,17 @@
 use std::f32::consts::PI;
 use std::ops::BitXor;
+use std::mem::transmute;
 
 use super::BufferedFlightData;
 use super::Quaternion;
 
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub struct FlightData {
+    // "SYNC" in ASCII. Not _guaranteed_ be exclusive with some
+    // subset of the fields below, but pretty unlikely.
+    sync: [u8; 4],
+
     // lsm6dsm: Outputs are in 2's complement, 16 bits
     // Units: X milli-dps / least-significant-bit,
     //        depending on Full Scale representation.
@@ -38,6 +44,9 @@ pub struct FlightData {
 
     // GPS in NMEA
     gps: [u8; 82],
+
+    // Sum of bytes between sync and checksum, modulo 4 bytes, all bits flipped (1's complement)
+    checksum: u32
 }
 
 impl FlightData {
@@ -85,7 +94,11 @@ impl FlightData {
             * 1000f32 // g -> mg
             * (1f32 / 0.244f32); // mg -> LSB
 
-        FlightData {
+        let mut sync: [u8; 4] = [0; 4];
+        sync.copy_from_slice("SYNC".as_bytes());
+
+        let mut ret = FlightData {
+            sync,
             roll_rate: (bfd.roll_rate * angular_rate_conversion) as i16,
             pitch_rate: (bfd.pitch_rate * angular_rate_conversion) as i16,
             yaw_rate: (bfd.yaw_rate * angular_rate_conversion) as i16,
@@ -104,7 +117,17 @@ impl FlightData {
                 * airspeed_pressure_conversion) as i16,
 
             gps: Self::conv_to_nmea(bfd.latitude, bfd.longitude),
-        }
+            checksum: 0,
+        };
+
+        let checksum: u32 = {
+            let raw_bytes: [u8; 116] = unsafe { transmute(ret) };
+            !(raw_bytes[4 .. 112].iter()
+                .fold(0u32, |sum, val| sum + (*val as u32)))
+        };
+        ret.checksum = checksum;
+
+        ret
     }
 
     // XXX: There are other NMEA formats we could send,
