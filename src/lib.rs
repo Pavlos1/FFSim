@@ -70,6 +70,8 @@ struct FFSim {
     // Buffers for bidirectional communication
     incoming: Output<BufferedControlData>,
     outgoing: Input<BufferedFlightData>,
+
+    fl: FlightLoop,
 }
 
 impl FFSim {
@@ -148,6 +150,32 @@ impl Plugin for FFSim {
 
             incoming: incoming_recv,
             outgoing: outgoing_send,
+
+            /* Read control inputs and write flight data to the buffers every flight cycle */
+            fl: FlightLoop::new(|_loop_state: &mut LoopState| {
+                // `PLUGIN` is a global created by `xplane_plugin!`
+                // It *should* be safe to take an exclusive reference,
+                // since X-Plane does not call us concurrently.
+                let plugin : &mut FFSim = unsafe { &mut *PLUGIN };
+
+                // Read from triple buffer and update controls
+                let control = *plugin.incoming.read();
+                plugin.rudder.set(control.rudder);
+                plugin.left_aileron.set(control.left_aileron);
+                plugin.right_aileron.set(control.right_aileron);
+                plugin.elevator.set(control.elevator);
+
+                // Throttle is a bit trickier b/c it's an array,
+                // but we only have one engine so we only set the
+                // first element.
+                let mut throttle_buf = [0.0; 8];
+                throttle_buf[0] = control.throttle;
+                plugin.throttle.set(&mut throttle_buf);
+
+                // Write flight data into triple buffer
+                let flight_data = plugin.get_data();
+                plugin.outgoing.write(flight_data);
+            })
         };
 
         //plugin.override_flightcontrol.set(true);
@@ -162,31 +190,7 @@ impl Plugin for FFSim {
         /* Thread to receive controller inputs */
         thread::spawn(move|| comm::recv_control_data_thread(incoming_send));
 
-        /* Read control inputs and write flight data to the buffers every flight cycle */
-        FlightLoop::new(|_loop_state: &mut LoopState| {
-            // `PLUGIN` is a global created by `xplane_plugin!`
-            // It *should* be safe to take an exclusive reference,
-            // since X-Plane does not call us concurrently.
-            let plugin : &mut FFSim = unsafe { &mut *PLUGIN };
-
-            // Read from triple buffer and update controls
-            let control = *plugin.incoming.read();
-            plugin.rudder.set(control.rudder);
-            plugin.left_aileron.set(control.left_aileron);
-            plugin.right_aileron.set(control.right_aileron);
-            plugin.elevator.set(control.elevator);
-
-            // Throttle is a bit trickier b/c it's an array,
-            // but we only have one engine so we only set the
-            // first element.
-            let mut throttle_buf = [0.0; 8];
-            throttle_buf[0] = control.throttle;
-            plugin.throttle.set(&mut throttle_buf);
-
-            // Write flight data into triple buffer
-            let flight_data = plugin.get_data();
-            plugin.outgoing.write(flight_data);
-        }).schedule_immediate();
+        plugin.fl.schedule_immediate();
 
         println!("[FFSim] Plugin loaded");
         Ok(plugin)
@@ -201,14 +205,24 @@ impl Plugin for FFSim {
     }
 
     fn enable(&mut self) {
-        
+        self.fl.schedule_immediate();
+
+        //plugin.override_flightcontrol.set(true);
+        self.override_control_surfaces.set(true);
+        self.override_throttles.set(true);
     }
     
     fn disable(&mut self) {
-        
+        self.fl.deactivate();
+
+        //self.override_flightcontrol.set(false);
+        self.override_control_surfaces.set(false);
+        self.override_throttles.set(false);
     }
     
     fn stop(&mut self) {
+        self.fl.deactivate();
+
         //self.override_flightcontrol.set(false);
         self.override_control_surfaces.set(false);
         self.override_throttles.set(false);
