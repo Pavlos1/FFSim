@@ -181,7 +181,8 @@ impl FlightData {
         res.push_str("\r\n");
 
         let mut ret: [u8; 82] = [0u8; 82];
-        ret.copy_from_slice(res.as_bytes());
+        let res_slice = res.as_bytes();
+        for i in 0 .. res_slice.len() { ret[i] = res_slice[i]; }
         ret
     }
 }
