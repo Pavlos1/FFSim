@@ -113,31 +113,23 @@ pub fn recv_control_data_thread(data_out_: Input<BufferedControlData>) {
                     else if let Some(pos) = buf.windows(4).position(|window|
                         *window == *"SYNC".as_bytes()) {
 
-                        let mut keep: [u8; CONTROL_DATA_SIZE] = [0; CONTROL_DATA_SIZE];
-                        keep.copy_from_slice(&buf[pos ..]);
-                        buf = keep;
+                        shift(&mut buf[..], pos);
                         cursor = CONTROL_DATA_SIZE - pos;
                     }
 
                     // case 3: "SYN" is at the end of the buf. The next input byte may well be
                     //         'C', so discard everything before "SYN" and move it to the front
                     else if buf[CONTROL_DATA_SIZE - 3 ..] == *"SYN".as_bytes() {
-                        let mut keep: [u8; CONTROL_DATA_SIZE] = [0; CONTROL_DATA_SIZE];
-                        keep.copy_from_slice(&buf[CONTROL_DATA_SIZE - 3 ..]);
-                        buf = keep;
+                        shift(&mut buf[..], CONTROL_DATA_SIZE - 3);
                         cursor = 3;
                     }
                     // The rest of the cases are fairly self-explanatory
                     else if buf[CONTROL_DATA_SIZE - 2 ..] == *"SY".as_bytes() {
-                        let mut keep: [u8; CONTROL_DATA_SIZE] = [0; CONTROL_DATA_SIZE];
-                        keep.copy_from_slice(&buf[CONTROL_DATA_SIZE - 2 ..]);
-                        buf = keep;
+                        shift(&mut buf[..], CONTROL_DATA_SIZE - 2);
                         cursor = 2;
                     }
                     else if buf[CONTROL_DATA_SIZE - 1 ..] == *"S".as_bytes() {
-                        let mut keep: [u8; CONTROL_DATA_SIZE] = [0; CONTROL_DATA_SIZE];
-                        keep.copy_from_slice(&buf[CONTROL_DATA_SIZE - 1 ..]);
-                        buf = keep;
+                        shift(&mut buf[..], CONTROL_DATA_SIZE - 1);
                         cursor = 1;
                     }
                     else {
@@ -165,6 +157,13 @@ pub fn recv_control_data_thread(data_out_: Input<BufferedControlData>) {
             }
         };
         ser = new_ser;
+    }
+}
+
+fn shift<T: Copy>(arr: &mut [T], start_pos: usize) {
+    let length = arr.len();
+    for i in start_pos .. length {
+        arr[i - start_pos] = arr[i];
     }
 }
 
