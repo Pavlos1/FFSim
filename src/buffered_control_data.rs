@@ -27,7 +27,7 @@ impl BufferedControlData {
         let max_deflection_deg: f32 = 15f32; // relative to zero in either direction
         // see comments in ControlData struct
         let control_surface_conversion = |input: u16| -> f32 {
-            (input as f32) * ((2f32 * max_deflection_deg) / ((2 << 11) - 1) as f32)
+            (input as f32) * ((2f32 * max_deflection_deg) / ((1 << 11) - 1) as f32)
                 - max_deflection_deg
         };
 
@@ -38,7 +38,7 @@ impl BufferedControlData {
             elevator: control_surface_conversion(cd.elevator),
 
             // throttle output is just [0, 1] so we divide it by the full range
-            throttle: (cd.throttle as f32) / (((2 << 11) - 1) as f32),
+            throttle: (cd.throttle as f32) / (((1 << 11) - 1) as f32),
         }
     }
 }
