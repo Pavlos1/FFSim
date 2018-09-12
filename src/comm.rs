@@ -91,56 +91,56 @@ pub fn recv_control_data_thread(data_out_: Input<BufferedControlData>) {
 
         let new_ser = match ser {
             Some(mut port) => {
-                if port.read_exact(&mut buf[cursor..]).is_ok() {
-
-                    // case 1: "SYNC" is at the start of the buffer, so we can
-                    //         interpret the whole thing as a ControlData struct
-                    if buf[..4] == *"SYNC".as_bytes() {
-                        let cd: ControlData = unsafe { transmute(buf) };
-                        if cd.verify() {
-                            // Actually pass the control data on to the flightsim
-                            data_out.write(BufferedControlData::from_external(cd));
-                        } else {
-                            println!("[FFSim] Bad checksum");
+                match port.read_exact(&mut buf[cursor..]) {
+                    Ok(_) => {
+                        // case 1: "SYNC" is at the start of the buffer, so we can
+                        //         interpret the whole thing as a ControlData struct
+                        if buf[..4] == *"SYNC".as_bytes() {
+                            let cd: ControlData = unsafe { transmute(buf) };
+                            if cd.verify() {
+                                // Actually pass the control data on to the flightsim
+                                data_out.write(BufferedControlData::from_external(cd));
+                            } else {
+                                println!("[FFSim] Bad checksum");
+                            }
+                            // In either case, we want to have an entirely fresh
+                            // buffer the next time
+                            cursor = 0;
                         }
-                        // In either case, we want to have an entirely fresh
-                        // buffer the next time
-                        cursor = 0;
+
+                        // case 2: "SYNC" is a substring. Discard all bytes before the substring,
+                        //         and move the rest up to make room for more input
+                        else if let Some(pos) = buf.windows(4).position(|window|
+                            *window == *"SYNC".as_bytes()) {
+                            shift(&mut buf[..], pos);
+                            cursor = CONTROL_DATA_SIZE - pos;
+                        }
+
+                        // case 3: "SYN" is at the end of the buf. The next input byte may well be
+                        //         'C', so discard everything before "SYN" and move it to the front
+                        else if buf[CONTROL_DATA_SIZE - 3..] == *"SYN".as_bytes() {
+                            shift(&mut buf[..], CONTROL_DATA_SIZE - 3);
+                            cursor = 3;
+                        }
+                        // The rest of the cases are fairly self-explanatory
+                        else if buf[CONTROL_DATA_SIZE - 2..] == *"SY".as_bytes() {
+                            shift(&mut buf[..], CONTROL_DATA_SIZE - 2);
+                            cursor = 2;
+                        } else if buf[CONTROL_DATA_SIZE - 1..] == *"S".as_bytes() {
+                            shift(&mut buf[..], CONTROL_DATA_SIZE - 1);
+                            cursor = 1;
+                        } else {
+                            cursor = 0;
+                        }
+
+                        Some(port)
                     }
 
-                    // case 2: "SYNC" is a substring. Discard all bytes before the substring,
-                    //         and move the rest up to make room for more input
-                    else if let Some(pos) = buf.windows(4).position(|window|
-                        *window == *"SYNC".as_bytes()) {
-
-                        shift(&mut buf[..], pos);
-                        cursor = CONTROL_DATA_SIZE - pos;
+                    Err(e) => {
+                        println!("[FFSim] Lost serial connection: receive, with error {:?}", e);
+                        cursor = 0; // unlikely that transmission will resume from the same point
+                        None
                     }
-
-                    // case 3: "SYN" is at the end of the buf. The next input byte may well be
-                    //         'C', so discard everything before "SYN" and move it to the front
-                    else if buf[CONTROL_DATA_SIZE - 3 ..] == *"SYN".as_bytes() {
-                        shift(&mut buf[..], CONTROL_DATA_SIZE - 3);
-                        cursor = 3;
-                    }
-                    // The rest of the cases are fairly self-explanatory
-                    else if buf[CONTROL_DATA_SIZE - 2 ..] == *"SY".as_bytes() {
-                        shift(&mut buf[..], CONTROL_DATA_SIZE - 2);
-                        cursor = 2;
-                    }
-                    else if buf[CONTROL_DATA_SIZE - 1 ..] == *"S".as_bytes() {
-                        shift(&mut buf[..], CONTROL_DATA_SIZE - 1);
-                        cursor = 1;
-                    }
-                    else {
-                        cursor = 0;
-                    }
-
-                    Some(port)
-                } else {
-                    println!("[FFSim] Lost serial connection: receive");
-                    cursor = 0; // unlikely that transmission will resume from the same point
-                    None
                 }
             }
             None => {
