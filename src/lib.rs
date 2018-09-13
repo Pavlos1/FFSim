@@ -39,8 +39,8 @@ struct FFSim {
     rudder: DataRef<f32, ReadWrite>, // XXX: Only the "left rudder" seems to have an effect on the plane
     left_aileron: DataRef<f32, ReadWrite>,
     right_aileron: DataRef<f32, ReadWrite>,
-    left_elevator: DataRef<f32, ReadWrite>, // XXX: The elevators can be controlled independently ..
-    right_elevator: DataRef<f32, ReadWrite>,
+    elevator1: DataRef<f32, ReadWrite>, // XXX: The elevators can be controlled independently ..
+    elevator2: DataRef<f32, ReadWrite>,
 
     throttle: DataRef<[f32], ReadWrite>,
 
@@ -120,11 +120,17 @@ impl Plugin for FFSim {
             override_control_surfaces: DataRef::find("sim/operation/override/override_control_surfaces")?.writeable()?,
             override_throttles: DataRef::find("sim/operation/override/override_throttles")?.writeable()?,
 
-            rudder: DataRef::find("sim/flightmodel/controls/ldruddef")?.writeable()?,
-            left_aileron: DataRef::find("sim/flightmodel/controls/lail1def")?.writeable()?,
-            right_aileron: DataRef::find("sim/flightmodel/controls/rail1def")?.writeable()?,
-            left_elevator: DataRef::find("sim/flightmodel/controls/wing1l_elv1def")?.writeable()?,
-            right_elevator: DataRef::find("sim/flightmodel/controls/wing1r_elv1def")?.writeable()?,
+            // XXX: These are based on the Cessna Skyhawk. For other planes you may need to
+            //      change which datarefs are used to move the control surfaces!
+            //
+            // Also while we're on the subject. A name like hstab1_elv1def means:
+            //  * The control surfaces is attached to the horizontal (h) stabilizer (stab)
+            //  * The control surface moves when the elevator (elv) command is sent from the yoke.
+            rudder: DataRef::find("sim/flightmodel/controls/vstab1_rud1def")?.writeable()?,
+            left_aileron: DataRef::find("sim/flightmodel/controls/wing1l_ail1def")?.writeable()?,
+            right_aileron: DataRef::find("sim/flightmodel/controls/wing1r_ail1def")?.writeable()?,
+            elevator1: DataRef::find("sim/flightmodel/controls/hstab1_elv1def")?.writeable()?,
+            elevator2: DataRef::find("sim/flightmodel/controls/hstab2_elv1def")?.writeable()?,
 
             throttle: DataRef::find("sim/flightmodel/engine/ENGN_thro_use")?.writeable()?,
 
@@ -165,8 +171,8 @@ impl Plugin for FFSim {
                 plugin.rudder.set(control.rudder);
                 plugin.left_aileron.set(control.left_aileron);
                 plugin.right_aileron.set(control.right_aileron);
-                plugin.left_elevator.set(control.elevator);
-                plugin.right_elevator.set(control.elevator);
+                plugin.elevator1.set(control.elevator);
+                plugin.elevator2.set(control.elevator);
 
                 // Throttle is a bit trickier b/c it's an array,
                 // but we only have one engine so we only set the
