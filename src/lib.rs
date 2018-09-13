@@ -39,7 +39,8 @@ struct FFSim {
     rudder: DataRef<f32, ReadWrite>, // XXX: Only the "left rudder" seems to have an effect on the plane
     left_aileron: DataRef<f32, ReadWrite>,
     right_aileron: DataRef<f32, ReadWrite>,
-    elevator: DataRef<f32, ReadWrite>, // XXX: Again there seems to be one value mirrored across many datarefs
+    left_elevator: DataRef<f32, ReadWrite>, // XXX: The elevators can be controlled independently ..
+    right_elevator: DataRef<f32, ReadWrite>,
 
     throttle: DataRef<[f32], ReadWrite>,
 
@@ -122,7 +123,8 @@ impl Plugin for FFSim {
             rudder: DataRef::find("sim/flightmodel/controls/ldruddef")?.writeable()?,
             left_aileron: DataRef::find("sim/flightmodel/controls/lail1def")?.writeable()?,
             right_aileron: DataRef::find("sim/flightmodel/controls/rail1def")?.writeable()?,
-            elevator: DataRef::find("sim/flightmodel/controls/wing1l_elv1def")?.writeable()?,
+            left_elevator: DataRef::find("sim/flightmodel/controls/wing1l_elv1def")?.writeable()?,
+            right_elevator: DataRef::find("sim/flightmodel/controls/wing1r_elv1def")?.writeable()?,
 
             throttle: DataRef::find("sim/flightmodel/engine/ENGN_thro_use")?.writeable()?,
 
@@ -163,7 +165,8 @@ impl Plugin for FFSim {
                 plugin.rudder.set(control.rudder);
                 plugin.left_aileron.set(control.left_aileron);
                 plugin.right_aileron.set(control.right_aileron);
-                plugin.elevator.set(control.elevator);
+                plugin.left_elevator.set(control.elevator);
+                plugin.right_elevator.set(control.elevator);
 
                 // Throttle is a bit trickier b/c it's an array,
                 // but we only have one engine so we only set the
