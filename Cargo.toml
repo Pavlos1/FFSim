@@ -9,8 +9,11 @@ doctest = false
 
 [dependencies]
 triple_buffer = "*"
-serial = "*"
 
 [dependencies.xplm]
 git = "https://github.com/Pavlos1/rust-xplm"
+branch = "master"
+
+[dependencies.serial]
+git = "https://github.com/Pavlos1/serial-rs"
 branch = "master"
