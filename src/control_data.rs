@@ -1,5 +1,6 @@
 use std::mem::transmute;
 
+// XXX: Fields assumed to be little endian
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct ControlData {

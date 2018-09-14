@@ -5,6 +5,7 @@ use std::mem::transmute;
 use super::BufferedFlightData;
 use super::Quaternion;
 
+// XXX: Fields assumed to be little endian
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct FlightData {
