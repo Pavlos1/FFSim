@@ -15,7 +15,7 @@ enabled. It's usually under the 'B' key.
 
 Communication is done via USB-UART (FTDI), so you will need to make sure the
 serial port has the right permissions set. Also you may need to hardcode the
-serial port used if it is not "/dev/ttyUSB0" or "COM5"&mdash;ideally this would
+serial port used if it is not `/dev/ttyUSB0` or `COM5`&mdash;ideally this would
 be configurable via the X-Plane GUI instead.
 
 > The plugin will print debug information if launched from the command line
