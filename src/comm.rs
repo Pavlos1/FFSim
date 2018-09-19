@@ -73,7 +73,7 @@ pub fn send_flight_data_thread(data_in_: Output<BufferedFlightData>) {
         };
         ser = new_ser;
 
-        thread::sleep(Duration::from_millis(30)); // ~30Hz
+        thread::sleep(Duration::from_millis(20)); // 50Hz
     }
 }
 
