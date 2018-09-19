@@ -12,7 +12,7 @@ triple_buffer = "*"
 
 [dependencies.xplm]
 git = "https://github.com/Pavlos1/rust-xplm"
-branch = "master"
+branch = "windows"
 
 [dependencies.serial]
 git = "https://github.com/Pavlos1/serial-rs"
