@@ -55,11 +55,12 @@ pub fn send_flight_data_thread(data_in_: Output<BufferedFlightData>) {
             Some(mut port) => {
                 let data = FlightData::new(*data_in.read());
                 let bytes: [u8; FLIGHT_DATA_SIZE] = unsafe { transmute(data) };
-                if port.write_all(&bytes[..]).is_ok() {
-                    Some(port)
-                } else {
-                    println!("[FFSim] Lost serial connection: send");
-                    None
+                match port.write_all(&bytes[..]) {
+                    Ok(_) => Some(port),
+                    Err(e) => {
+                        println!("[FFSim] Lost serial connection: send, with error {:?}", e);
+                        None
+                    },
                 }
             }
             None => {
