@@ -42,6 +42,7 @@ fn ser_connect() -> io::Result<serial::SystemPort> {
 }
 
 pub fn send_flight_data_thread(data_in_: Output<BufferedFlightData>) {
+    let mut first_error = true;
     let mut data_in = data_in_;
     let mut ser: Option<Box<serial::SystemPort>> = None;
 
@@ -67,7 +68,13 @@ pub fn send_flight_data_thread(data_in_: Output<BufferedFlightData>) {
                         println!("[FFSim] Got serial connection: send");
                         Some(Box::new(port))
                     }
-                    Err(_) => None,
+                    Err(e) => {
+                        if first_error {
+                            println!("[FFSim] Serial connection failed: send, with error {:?}", e);
+                            first_error = false;
+                        }
+                        None
+                    },
                 }
             }
         };
@@ -78,6 +85,7 @@ pub fn send_flight_data_thread(data_in_: Output<BufferedFlightData>) {
 }
 
 pub fn recv_control_data_thread(data_out_: Input<BufferedControlData>) {
+    let mut first_error = true;
     let mut data_out = data_out_;
     let mut ser: Option<Box<serial::SystemPort>> = None;
 
@@ -149,7 +157,11 @@ pub fn recv_control_data_thread(data_out_: Input<BufferedControlData>) {
                         println!("[FFSim] Got serial connection: receive");
                         Some(Box::new(port))
                     }
-                    Err(_) => {
+                    Err(e) => {
+                        if first_error {
+                            println!("[FFSim] Serial connection failed: receive, with error {:?}", e);
+                            first_error = false;
+                        }
                         thread::sleep(Duration::from_millis(200));
                         None
                     }
