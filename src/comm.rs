@@ -4,6 +4,7 @@ use std::time::Duration;
 use std::thread;
 use std::mem::transmute;
 use std::sync::atomic::Ordering;
+use std::sync::{Arc, Mutex};
 use serial;
 use serial::SerialPort;
 
@@ -41,15 +42,18 @@ fn ser_connect() -> io::Result<serial::SystemPort> {
     Ok(ser)
 }
 
-pub fn send_flight_data_thread(data_in_: Output<BufferedFlightData>) {
-    let mut first_error = true;
+pub fn send_flight_data_thread(data_in_: Output<BufferedFlightData>, ser_: Arc<Mutex<Option<serial::SystemPort>>>) {
     let mut data_in = data_in_;
-    let mut ser: Option<Box<serial::SystemPort>> = None;
+    let mut ser: Option<serial::SystemPort>;
 
     loop {
         if STOP_THREADS.load(Ordering::SeqCst) {
             break;
         }
+
+        let guard = ser_.lock().unwrap();
+        ser = guard.clone();
+        drop(guard);
 
         let new_ser = match ser {
             Some(mut port) => {
@@ -59,6 +63,7 @@ pub fn send_flight_data_thread(data_in_: Output<BufferedFlightData>) {
                     Ok(_) => Some(port),
                     Err(e) => {
                         println!("[FFSim] Lost serial connection: send, with error {:?}", e);
+                        port.close();
                         None
                     },
                 }
@@ -66,14 +71,11 @@ pub fn send_flight_data_thread(data_in_: Output<BufferedFlightData>) {
             None => {
                 match ser_connect() {
                     Ok(port) => {
-                        println!("[FFSim] Got serial connection: send");
-                        Some(Box::new(port))
+                        println!("[FFSim] Got serial connection");
+                        Some(port)
                     }
                     Err(e) => {
-                        if first_error {
-                            println!("[FFSim] Serial connection failed: send, with error {:?}", e);
-                            first_error = false;
-                        }
+                        println!("[FFSim] Serial connection failed: send, with error {:?}", e);
                         None
                     },
                 }
@@ -81,14 +83,17 @@ pub fn send_flight_data_thread(data_in_: Output<BufferedFlightData>) {
         };
         ser = new_ser;
 
+        let mut guard = ser_.lock().unwrap();
+        *guard = ser.clone();
+        drop(guard);
+
         thread::sleep(Duration::from_millis(20)); // 50Hz
     }
 }
 
-pub fn recv_control_data_thread(data_out_: Input<BufferedControlData>) {
-    let mut first_error = true;
+pub fn recv_control_data_thread(data_out_: Input<BufferedControlData>, ser_: Arc<Mutex<Option<serial::SystemPort>>>) {
     let mut data_out = data_out_;
-    let mut ser: Option<Box<serial::SystemPort>> = None;
+    let mut ser: Option<serial::SystemPort>;
 
     let mut buf: [u8; CONTROL_DATA_SIZE] = [0; CONTROL_DATA_SIZE];
     let mut cursor: usize = 0;
@@ -98,7 +103,11 @@ pub fn recv_control_data_thread(data_out_: Input<BufferedControlData>) {
             break;
         }
 
-        let new_ser = match ser {
+        let guard = ser_.lock().unwrap();
+        ser = guard.clone();
+        drop(guard);
+
+        match ser {
             Some(mut port) => {
                 match port.read_exact(&mut buf[cursor..]) {
                     Ok(_) => {
@@ -141,35 +150,23 @@ pub fn recv_control_data_thread(data_out_: Input<BufferedControlData>) {
                         } else {
                             cursor = 0;
                         }
-
-                        Some(port)
                     }
 
                     Err(e) => {
                         println!("[FFSim] Lost serial connection: receive, with error {:?}", e);
                         cursor = 0; // unlikely that transmission will resume from the same point
-                        None
+
+                        let mut guard = ser_.lock().unwrap();
+                        port.close();
+                        *guard = None;
+                        drop(guard);
                     }
                 }
             }
             None => {
-                match ser_connect() {
-                    Ok(port) => {
-                        println!("[FFSim] Got serial connection: receive");
-                        Some(Box::new(port))
-                    }
-                    Err(e) => {
-                        if first_error {
-                            println!("[FFSim] Serial connection failed: receive, with error {:?}", e);
-                            first_error = false;
-                        }
-                        thread::sleep(Duration::from_millis(200));
-                        None
-                    }
-                }
+                thread::sleep(Duration::from_millis(200));
             }
-        };
-        ser = new_ser;
+        }
     }
 }
 

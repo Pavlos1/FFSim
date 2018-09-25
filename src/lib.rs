@@ -8,6 +8,7 @@ use xplm::flight_loop::{FlightLoop, LoopState};
 use triple_buffer::{TripleBuffer, Input, Output};
 use std::thread;
 use std::sync::atomic::{AtomicBool, Ordering, ATOMIC_BOOL_INIT};
+use std::sync::{Arc, Mutex};
 
 mod buffered_control_data;
 mod buffered_flight_data;
@@ -73,6 +74,7 @@ struct FFSim {
     outgoing: Input<BufferedFlightData>,
 
     fl: FlightLoop,
+    ser: Arc<Mutex<Option<serial::SystemPort>>>,
 }
 
 impl FFSim {
@@ -113,6 +115,8 @@ impl Plugin for FFSim {
             = TripleBuffer::new(BufferedControlData::new()).split();
         let (outgoing_send, outgoing_recv)
             = TripleBuffer::new(BufferedFlightData::new()).split();
+
+        let ser: Arc<Mutex<Option<serial::SystemPort>>> = Arc::new(Mutex::new(None));
 
         /* Get handles to datarefs */
         let mut plugin = FFSim {
@@ -184,7 +188,8 @@ impl Plugin for FFSim {
                 // Write flight data into triple buffer
                 let flight_data = plugin.get_data();
                 plugin.outgoing.write(flight_data);
-            })
+            }),
+            ser: ser.clone(),
         };
 
         //plugin.override_flightcontrol.set(true);
@@ -194,10 +199,12 @@ impl Plugin for FFSim {
         STOP_THREADS.store(false, Ordering::SeqCst);
 
         /* Thread to send flight data to controller */
-        thread::spawn(move|| comm::send_flight_data_thread(outgoing_recv));
+        let ser_tmp1 = ser.clone();
+        thread::spawn(move|| comm::send_flight_data_thread(outgoing_recv, ser_tmp1));
 
         /* Thread to receive controller inputs */
-        thread::spawn(move|| comm::recv_control_data_thread(incoming_send));
+        let ser_tmp2 = ser.clone();
+        thread::spawn(move|| comm::recv_control_data_thread(incoming_send, ser_tmp2));
 
         plugin.fl.schedule_immediate();
 
@@ -237,6 +244,11 @@ impl Plugin for FFSim {
         self.override_throttles.set(false);
 
         STOP_THREADS.store(true, Ordering::SeqCst);
+
+        match self.ser.lock().unwrap().as_mut() {
+            Some(port) => port.close(),
+            None => (),
+        };
     }
 }
 
