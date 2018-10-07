@@ -22,6 +22,17 @@ be configurable via the X-Plane GUI instead.
 with `./X-Plane-x86 |grep FFSim` or similar. It will print a message when
 the serial connection is established or lost.
 
+## Windows
+Windows has a few prerequisites. The following worked for an RSCS Windows 10
+Education machine, YMMV:
+
+1. Install Cygwin. Make sure the standard development packages are installed
+&mdash;in particular a 64-bit GNU linker is essential.
+1. Install Rust via the [EXE](https://win.rustup.rs/x86_64). When prompted,
+enter your host triple as `x86_64-pc-windows-gnu`.
+1. Install LLVM via the latest 64-bit prebuild Windows binary available from
+the LLVM [releases page](https://releases.llvm.org/download.html).
+
 ## Building
 **You must use a 64-bit compiler**
 
