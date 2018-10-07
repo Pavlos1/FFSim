@@ -50,8 +50,8 @@ struct FFSim {
     pitch_rate: DataRef<f32, ReadOnly>, // ...
     yaw_rate: DataRef<f32, ReadOnly>,   // ...
 
-    // XXX: Remember to negate these guys!!
     true_theta: DataRef<f32, ReadOnly>, // degrees, pitch
+    true_phi: DataRef<f32, ReadOnly>,   // degrees, roll
     mag_psi: DataRef<f32, ReadOnly>,    // degrees, yaw
 
     local_ax: DataRef<f32, ReadOnly>,
@@ -88,6 +88,7 @@ impl FFSim {
             pitch_rate: self.pitch_rate.get(),
             yaw_rate: self.yaw_rate.get(),
             true_theta: self.true_theta.get(),
+            true_phi: self.true_phi.get(),
             mag_psi: self.mag_psi.get(),
             local_ax: self.local_ax.get(),
             local_ay: self.local_ay.get(),
@@ -144,6 +145,7 @@ impl Plugin for FFSim {
             yaw_rate: DataRef::find("sim/flightmodel/position/R")?,
 
             true_theta: DataRef::find("sim/flightmodel/position/true_theta")?,
+            true_phi: DataRef::find("sim/flightmodel/position/true_phi")?,
             mag_psi: DataRef::find("sim/flightmodel/position/mag_psi")?,
 
             local_ax: DataRef::find("sim/flightmodel/position/local_ax")?,

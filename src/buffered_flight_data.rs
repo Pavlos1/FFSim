@@ -6,6 +6,7 @@ pub struct BufferedFlightData {
     pub yaw_rate: f32,
 
     pub true_theta: f32,
+    pub true_phi: f32,
     pub mag_psi: f32,
 
     pub local_ax: f32,
@@ -30,6 +31,7 @@ impl BufferedFlightData {
             pitch_rate: 0.0,
             yaw_rate: 0.0,
             true_theta: 0.0,
+            true_phi: 0.0,
             mag_psi: 0.0,
             local_ax: 0.0,
             local_ay: 0.0,

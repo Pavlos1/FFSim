@@ -13,6 +13,19 @@ pub struct FlightData {
     // subset of the fields below, but pretty unlikely.
     sync: [u8; 4],
 
+    // These are sent to allow debugging of the flight controller.
+    // They SHOULD NOT be used to test a production system, since
+    // they don't correspond to any physical measurement our actual
+    // aircraft could make.
+    //
+    // Units are the same as for roll_rate etc. below for simplicity.
+    roll: i16,
+    pitch: i16,
+    yaw: i16,
+
+    // better to be explicit; `barometer` below needs to be 32-bit aligned
+    _pad: i16,
+
     // lsm6dsm: Outputs are in 2's complement, 16 bits
     // Units: X milli-dps / least-significant-bit,
     //        depending on Full Scale representation.
@@ -50,7 +63,7 @@ pub struct FlightData {
     checksum: u32
 }
 
-pub const FLIGHT_DATA_SIZE: usize = 116;
+pub const FLIGHT_DATA_SIZE: usize = 124;
 
 impl FlightData {
     pub fn new(bfd: BufferedFlightData) -> Self {
@@ -102,6 +115,12 @@ impl FlightData {
 
         let mut ret = FlightData {
             sync,
+
+            roll: (bfd.true_phi * angular_rate_conversion) as i16,
+            pitch: (bfd.true_theta * angular_rate_conversion) as i16,
+            yaw: (bfd.mag_psi * angular_rate_conversion) as i16,
+            _pad: 0,
+
             roll_rate: (bfd.roll_rate * angular_rate_conversion) as i16,
             pitch_rate: (bfd.pitch_rate * angular_rate_conversion) as i16,
             yaw_rate: (bfd.yaw_rate * angular_rate_conversion) as i16,
