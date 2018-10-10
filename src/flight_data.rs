@@ -43,7 +43,8 @@ pub struct FlightData {
     mag_x: i16,
     mag_y: i16,
     mag_z: i16,
-    temp: i16, // can also get from barometer, both 16 bits, also both _ambient_ probably
+    // From IMU (lsm6dsm). can also get from barometer, both 16 bits, also both _ambient_ probably
+    temp: i16,
 
     // lps25hb
     barometer: u32, // 24 bits, 4K LSB/hPa, abs. range 260-1260 hPa
