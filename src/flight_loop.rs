@@ -56,11 +56,19 @@ pub fn flight_loop(_loop_state: &mut LoopState) {
                         // to a file.
                         let latencies = plugin.latencies;
                         thread::spawn(move|| {
-                            let mut out = File::open("latencies.csv").unwrap();
-                            for latency in latencies.iter() {
-                                assert!(latency.as_secs() == 0, "[FFSim] Fatal: >1s latencies!");
-                                out.write_all(format!("{}\n", latency.subsec_nanos())
-                                    .as_bytes()).unwrap();
+                            match File::create("latencies.csv") {
+                                Ok(mut out) => {
+                                    for latency in latencies.iter() {
+                                        out.write_all(format!("{}\n",
+                                                              latency.as_secs() * 1_000_000_000
+                                                                  + latency.subsec_nanos() as u64)
+                                            .as_bytes()).unwrap();
+                                    }
+                                    println!("[FFSim] Successfully wrote latencies");
+                                },
+                                Err(e) => {
+                                    println!("[FFSim] Couldn't open file for writing latencies: {:?}", e);
+                                }
                             }
                         });
                     }
