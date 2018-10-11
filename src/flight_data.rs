@@ -1,6 +1,7 @@
 use std::f32::consts::PI;
 use std::ops::BitXor;
 use std::mem::transmute;
+use std::time::UNIX_EPOCH;
 
 use super::BufferedFlightData;
 use super::Quaternion;
@@ -60,11 +61,14 @@ pub struct FlightData {
     // GPS in NMEA
     gps: [u8; 82],
 
+    // Directly from BufferedFlightData. Controller treats this as a black box.
+    time: [u8; 16],
+
     // Sum of bytes between sync and checksum, modulo 4 bytes, all bits flipped (1's complement)
     checksum: u32
 }
 
-pub const FLIGHT_DATA_SIZE: usize = 124;
+pub const FLIGHT_DATA_SIZE: usize = 140;
 
 impl FlightData {
     pub fn new(bfd: BufferedFlightData) -> Self {
@@ -114,6 +118,8 @@ impl FlightData {
         let mut sync: [u8; 4] = [0; 4];
         sync.copy_from_slice("SYNC".as_bytes());
 
+        let time = bfd.time.duration_since(UNIX_EPOCH).unwrap();
+
         let mut ret = FlightData {
             sync,
 
@@ -140,6 +146,7 @@ impl FlightData {
                 * airspeed_pressure_conversion) as i16,
 
             gps: Self::conv_to_nmea(bfd.latitude, bfd.longitude),
+            time: unsafe { transmute(time) },
             checksum: 0,
         };
 

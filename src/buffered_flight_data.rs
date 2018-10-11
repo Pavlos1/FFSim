@@ -1,3 +1,5 @@
+use std::time::SystemTime;
+
 // See FFSim struct for comments about these values
 #[derive(Copy, Clone, Debug)]
 pub struct BufferedFlightData {
@@ -22,6 +24,11 @@ pub struct BufferedFlightData {
 
     pub ambient_temp: f32,
     pub air_density: f32,
+
+    // Time of creation; used to measure round trip latency.
+    // SystemTime can change under us; hopefully running the latency
+    // experiment multiple times should amortize the effects of this.
+    pub time: SystemTime,
 }
 
 impl BufferedFlightData {
@@ -43,6 +50,7 @@ impl BufferedFlightData {
             ambient_temp: 0.0,
             barometer_inhg: 0.0,
             air_density: 0.0,
+            time: SystemTime::now(),
         }
     }
 }

@@ -3,12 +3,13 @@ extern crate xplm;
 use xplm::plugin::{Plugin, PluginInfo};
 
 use xplm::data::borrowed::{DataRef, FindError};
-use xplm::data::{ReadOnly, ReadWrite, DataRead, DataReadWrite, ArrayRead, ArrayReadWrite};
-use xplm::flight_loop::{FlightLoop, LoopState};
+use xplm::data::{ReadOnly, ReadWrite, DataRead, DataReadWrite, ArrayRead};
+use xplm::flight_loop::FlightLoop;
 use triple_buffer::{TripleBuffer, Input, Output};
 use std::thread;
 use std::sync::atomic::{AtomicBool, Ordering, ATOMIC_BOOL_INIT};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 mod buffered_control_data;
 mod buffered_flight_data;
@@ -16,19 +17,23 @@ mod control_data;
 mod flight_data;
 mod quaternion;
 mod comm;
+mod flight_loop;
 
 use self::buffered_control_data::BufferedControlData;
 use self::buffered_flight_data::BufferedFlightData;
 use self::control_data::ControlData;
 use self::flight_data::FlightData;
 use self::quaternion::Quaternion;
+use self::flight_loop::flight_loop;
 
 extern crate triple_buffer;
 extern crate serial;
 
 pub static STOP_THREADS: AtomicBool = ATOMIC_BOOL_INIT;
 
-struct FFSim {
+const NUM_LATENCY_MEASUREMENTS: usize = 100;
+
+pub struct FFSim {
     // overrides all flight control, i.e. throttle, control surfaces etc.
     //override_flightcontrol: DataRef<bool, ReadWrite>,
     // overrides only control surfaces
@@ -75,10 +80,15 @@ struct FFSim {
 
     fl: FlightLoop,
     ser: Arc<Mutex<Option<serial::SystemPort>>>,
+
+    // latency measurement
+    latencies: [Duration; NUM_LATENCY_MEASUREMENTS],
+    num_latencies: usize,
+    last_time: SystemTime,
 }
 
 impl FFSim {
-    fn get_data(&self) -> BufferedFlightData {
+    pub fn get_data(&self, time: SystemTime) -> BufferedFlightData {
         // Throttle: we are only interested in first value
         let mut throttle_buf: [f32; 4] = [0.0; 4];
         self.throttle.get(&mut throttle_buf);
@@ -100,6 +110,7 @@ impl FFSim {
             barometer_inhg: self.barometer_inhg.get(),
             ambient_temp: self.temperature_ambient_c.get(),
             air_density: self.air_density.get(),
+            time,
         };
 
         self.plane_orientation_quaternion.get(&mut ret.plane_orientation_quaternion);
@@ -166,32 +177,13 @@ impl Plugin for FFSim {
             outgoing: outgoing_send,
 
             /* Read control inputs and write flight data to the buffers every flight cycle */
-            fl: FlightLoop::new(|_loop_state: &mut LoopState| {
-                // `PLUGIN` is a global created by `xplane_plugin!`
-                // It *should* be safe to take an exclusive reference,
-                // since X-Plane does not call us concurrently.
-                let plugin : &mut FFSim = unsafe { &mut *PLUGIN };
+            fl: FlightLoop::new(flight_loop),
 
-                // Read from triple buffer and update controls
-                let control = *plugin.incoming.read();
-                plugin.rudder.set(control.rudder);
-                plugin.left_aileron.set(control.left_aileron);
-                plugin.right_aileron.set(control.right_aileron);
-                plugin.elevator1.set(control.elevator);
-                plugin.elevator2.set(control.elevator);
-
-                // Throttle is a bit trickier b/c it's an array,
-                // but we only have one engine so we only set the
-                // first element.
-                let mut throttle_buf = [0.0; 8];
-                throttle_buf[0] = control.throttle;
-                plugin.throttle.set(&mut throttle_buf);
-
-                // Write flight data into triple buffer
-                let flight_data = plugin.get_data();
-                plugin.outgoing.write(flight_data);
-            }),
             ser: ser.clone(),
+
+            latencies: [Duration::from_millis(0); NUM_LATENCY_MEASUREMENTS],
+            num_latencies: 0,
+            last_time: UNIX_EPOCH,
         };
 
         //plugin.override_flightcontrol.set(true);

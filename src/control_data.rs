@@ -18,11 +18,15 @@ pub struct ControlData {
     pub throttle: u16,
     _pad: u16, // better to be explicit
 
+    // Timestamp of the flight data from which the controller generated
+    // these control inputs.
+    pub time: [u8; 16],
+
     // Sum of bytes between sync and checksum, modulo 4 bytes, all bits flipped (1's complement)
     checksum: u32,
 }
 
-pub const CONTROL_DATA_SIZE: usize = 20;
+pub const CONTROL_DATA_SIZE: usize = 36;
 
 impl ControlData {
     pub fn verify(&self) -> bool {
