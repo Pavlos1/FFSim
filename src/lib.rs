@@ -31,7 +31,8 @@ extern crate serial;
 
 pub static STOP_THREADS: AtomicBool = ATOMIC_BOOL_INIT;
 
-const NUM_LATENCY_MEASUREMENTS: usize = 100;
+pub const NUM_LATENCY_MEASUREMENTS: usize = 100;
+const SACRIFICE_LATENCY_MEASUREMENTS: usize = 100; // initially the latency is very erratic
 
 pub struct FFSim {
     // overrides all flight control, i.e. throttle, control surfaces etc.
@@ -83,7 +84,7 @@ pub struct FFSim {
 
     // latency measurement
     latencies: [Duration; NUM_LATENCY_MEASUREMENTS],
-    num_latencies: usize,
+    num_latencies: isize,
     last_time: SystemTime,
 }
 
@@ -182,7 +183,7 @@ impl Plugin for FFSim {
             ser: ser.clone(),
 
             latencies: [Duration::from_millis(0); NUM_LATENCY_MEASUREMENTS],
-            num_latencies: 0,
+            num_latencies: - (SACRIFICE_LATENCY_MEASUREMENTS as isize),
             last_time: UNIX_EPOCH,
         };
 

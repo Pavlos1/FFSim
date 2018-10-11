@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io::Write;
 use FFSim;
 use PLUGIN;
+use NUM_LATENCY_MEASUREMENTS;
 
 pub fn flight_loop(_loop_state: &mut LoopState) {
     // For latency computations, we measure the _start_ time from
@@ -42,16 +43,18 @@ pub fn flight_loop(_loop_state: &mut LoopState) {
         // N.B. This is the end time for the packet we sent _last time_.
         match control.time.elapsed() {
             Ok(dur) => {
-                // num_latencies >= 100 means we have concluded the experiment
+                // num_latencies >= NUM_LATENCY_MEASUREMENTS means we have concluded the experiment
                 // already. We don't do this check earlier b/c we want the loop
                 // to take the same amount of time regardless of if the experiment is
                 // running. (Optimizing compiler might have other ideas though.)
-                if plugin.num_latencies < 100 {
-                    plugin.latencies[plugin.num_latencies] = dur;
+                if plugin.num_latencies < NUM_LATENCY_MEASUREMENTS as isize {
+                    if plugin.num_latencies >= 0 {
+                        plugin.latencies[plugin.num_latencies as usize] = dur;
+                    }
                     plugin.num_latencies += 1;
                     plugin.last_time = control.time;
 
-                    if plugin.num_latencies == 100 {
+                    if plugin.num_latencies == NUM_LATENCY_MEASUREMENTS as isize {
                         // End of experiment. Spawn a new thread to write data
                         // to a file.
                         let latencies = plugin.latencies;
