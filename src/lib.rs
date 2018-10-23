@@ -86,6 +86,10 @@ pub struct FFSim {
     latencies: [Duration; NUM_LATENCY_MEASUREMENTS],
     num_latencies: isize,
     last_time: SystemTime,
+
+    // physics engine rate update measurement
+    time_start: SystemTime,
+    cycle_count: usize,
 }
 
 impl FFSim {
@@ -185,6 +189,9 @@ impl Plugin for FFSim {
             latencies: [Duration::from_millis(0); NUM_LATENCY_MEASUREMENTS],
             num_latencies: - (SACRIFICE_LATENCY_MEASUREMENTS as isize),
             last_time: UNIX_EPOCH,
+
+            time_start: UNIX_EPOCH,
+            cycle_count: 0,
         };
 
         //plugin.override_flightcontrol.set(true);

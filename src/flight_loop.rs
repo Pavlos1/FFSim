@@ -15,6 +15,10 @@ pub fn flight_loop(_loop_state: &mut LoopState) {
     // contributes to latency.)
     //
     // N.B. This is the start time of the _new_ packet we are about to send.
+    //
+    // N.B. Also this is the start time of our part fo the flight loop, so
+    //      subtracting these values from different flight loops gives us how
+    //      long it takes an _integer number of flight loops_ to complete (in theory).
     let new_start_time = SystemTime::now();
 
     // `PLUGIN` is a global created by `xplane_plugin!`
@@ -50,6 +54,14 @@ pub fn flight_loop(_loop_state: &mut LoopState) {
                 if plugin.num_latencies < NUM_LATENCY_MEASUREMENTS as isize {
                     if plugin.num_latencies >= 0 {
                         plugin.latencies[plugin.num_latencies as usize] = dur;
+
+                        // Start measuring the total time of the experiment; this will be used
+                        // to determine the average refresh rate of the physics engine during
+                        // the test.
+                        if plugin.num_latencies == 0 {
+                            plugin.time_start = new_start_time;
+                        }
+                        plugin.cycle_count += 1;
                     }
                     plugin.num_latencies += 1;
                     plugin.last_time = control.time;
@@ -58,14 +70,38 @@ pub fn flight_loop(_loop_state: &mut LoopState) {
                         // End of experiment. Spawn a new thread to write data
                         // to a file.
                         let latencies = plugin.latencies;
+                        let time_start = plugin.time_start;
+                        let cycles = plugin.cycle_count;
                         thread::spawn(move|| {
                             match File::create("latencies.csv") {
                                 Ok(mut out) => {
-                                    for latency in latencies.iter() {
-                                        out.write_all(format!("{}\n",
-                                                              latency.as_secs() * 1_000_000_000
-                                                                  + latency.subsec_nanos() as u64)
+                                    out.write_all("latencies,refresh\n".as_bytes())
+                                        .unwrap();
+                                    for i in 0 .. latencies.len() {
+                                        out.write_all(format!("{}",
+                                                              latencies[i].as_secs() * 1_000_000_000
+                                                                  + latencies[i].subsec_nanos() as u64)
                                             .as_bytes()).unwrap();
+
+                                        // write physics engine refresh rate into first row
+                                        if i == 0 {
+                                            let time_diff
+                                                = new_start_time.duration_since(time_start)
+                                                .unwrap();
+
+                                            let time_diff_ns = (time_diff.as_secs()
+                                                * 1_000_000_000 + time_diff.subsec_nanos() as u64)
+                                                as f64;
+
+                                            let adjusted_cycles = (cycles * 1_000_000_000)
+                                                as f64;
+
+                                            out.write_all(format!(",{}",
+                                                                  adjusted_cycles/time_diff_ns)
+                                                .as_bytes()).unwrap();
+                                        }
+                                        out.write_all("\n".as_bytes()).unwrap();
+
                                     }
                                     println!("[FFSim] Successfully wrote latencies");
                                 },
