@@ -176,7 +176,7 @@ impl Plugin for FFSim {
             barometer_inhg: DataRef::find("sim/weather/barometer_current_inhg")?,
             temperature_ambient_c: DataRef::find("sim/weather/temperature_ambient_c")?,
             //temperature_le_c: DataRef::find("sim/weather/temperature_le_c")?,
-            air_density: DataRef::find("sim/weather/rho")?,
+            air_density: DataRef::find("sim/physics/rho_sea_level")?,
 
             incoming: incoming_recv,
             outgoing: outgoing_send,
